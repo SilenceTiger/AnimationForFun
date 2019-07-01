@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>three.js webgl - cloth simulation</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            font-family: Monospace;
+            background-color: #000;
+            color: #000;
+            margin: 0px;
+            overflow: hidden;
+        }
+
+        #info {
+            position: absolute;
+            padding: 10px;
+            width: 100%;
+            text-align: center;
+        }
+
+        a {
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">简单布料模拟<br />
+        <a onclick="wind = !wind;">风</a> |
+        <a onclick="sphere.visible = !sphere.visible;">球</a> |
+        <a onclick="togglePins();">悬挂</a>
+    </div>
+
+    <script src="js/three.js"></script>
+    <!-- <script src="js/WebGL.js"></script> -->
+    <!-- 漫游器设置 一些拖拽效果 -->
+    <!-- <script src="js/TrackballControls.js"></script> -->
+    <!-- 轨道控制器 -->
+    <script src="js/OrbitControls.js"></script>
+    <script src="js/stats.min.js"></script>
+    <script src="js/Cloth.js"></script>
+
+    <script>
+        /* testing cloth simulation */
+
+        var pinsFormation = [];
+        var pins = [6];
+
+        pinsFormation.push(pins);
+
+        pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        pinsFormation.push(pins);
+
+        pins = [0];
+        pinsFormation.push(pins);
+
+        pins = []; // cut the rope ;)
+        pinsFormation.push(pins);
+
+        pins = [0, cloth.w]; // classic 2 pins
+        pinsFormation.push(pins);
+
+        pins = pinsFormation[1];
+
+        console.log(pinsFormation)
+
+        function togglePins() {
+
+            pins = pinsFormation[~~(Math.random() * pinsFormation.length)]; //向下取整
+
+        }
+
+        // if (WEBGL.isWebGLAvailable() === false) {
+
+        //     document.body.appendChild(WEBGL.getWebGLErrorMessage());
+
+        // }
+
+        var container, stats;
+        var camera, scene, renderer;
+
+        var clothGeometry;
+        var sphere;
+        var object;
+
+        init();
+        animate();
+
+        function init() {
+
+            container = document.createElement('div');
+            document.body.appendChild(container);
+
+            // scene
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xcce0ff);
+            scene.fog = new THREE.Fog(0xcce0ff, 500, 10000); //雾的效果
+
+            // camera
+
+            camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.set(1000, 50, 1500);
+
+            // lights
+
+            scene.add(new THREE.AmbientLight(0x666666)); //环境光
+
+            var light = new THREE.DirectionalLight(0xdfebff, 1); //平行光
+            light.position.set(50, 200, 100);
+            light.position.multiplyScalar(1.3);
+
+            light.castShadow = true;
+
+            light.shadow.mapSize.width = 1024;
+            light.shadow.mapSize.height = 1024;
+
+            var d = 300;
+
+            light.shadow.camera.left = -d;
+            light.shadow.camera.right = d;
+            light.shadow.camera.top = d;
+            light.shadow.camera.bottom = -d;
+
+            light.shadow.camera.far = 1000;
+
+            scene.add(light);
+
+            // cloth material
+
+            var loader = new THREE.TextureLoader();
+            var clothTexture = loader.load('js/texture.jpg');
+            clothTexture.anisotropy = 16;
+            // anisotropy： 沿通过具有最高纹理像素密度的像素的坐标轴取样的数量。默认情况下，此值为1.较高的值会产生比基本mipmap更少的模糊结果，但需要使用更多纹理样本。使用renderer.getMaxAnisotropy（）来查找GPU的最大有效各向异性值; 这个值通常是2的幂。
+            // 这样能实现什么效果呢：如果大家想让物体缩小的时候，任然比较清晰，可以将 anisotropy： 设大；
+            clothTexture.flipY = false; //翻转图像 是否翻转Y轴，three中默认值为true
+            //clothTexture.rotation = 0.5  //翻转效果有些奇怪
+
+            //材质
+            var clothMaterial = new THREE.MeshLambertMaterial({
+                map: clothTexture,
+                side: THREE.DoubleSide,
+                alphaTest: 0.5
+            });
+
+            // cloth geometry
+            // what is 'clothFunction' and cloth
+            // print it 
+            //console.log(clothFunction)  // see it in Cloth.js
+            //console.log(cloth)
+
+            clothGeometry = new THREE.ParametricGeometry(clothFunction, cloth.w, cloth.h); //参数结构体
+
+            // cloth mesh
+            // 材质 + 几何图形  =>  网格 
+            // 相当于是一种映射关系
+            object = new THREE.Mesh(clothGeometry, clothMaterial);
+            object.position.set(0, 0, 0);
+            object.castShadow = true;
+            scene.add(object);
+
+            object.customDepthMaterial = new THREE.MeshDepthMaterial({
+
+                depthPacking: THREE.RGBADepthPacking,
+                map: clothTexture,
+                alphaTest: 0.5
+
+            });
+
+            // sphere 球体
+
+            var ballGeo = new THREE.SphereBufferGeometry(ballSize, 32, 16);
+            var ballMaterial = new THREE.MeshLambertMaterial();
+
+            sphere = new THREE.Mesh(ballGeo, ballMaterial);
+            sphere.castShadow = true;
+            sphere.receiveShadow = true;
+            scene.add(sphere);
+
+            // ground 地面
+
+            var groundTexture = loader.load('js/grasslight-big.jpg');
+            groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+            groundTexture.repeat.set(25, 25);
+            groundTexture.anisotropy = 16;
+
+            var groundMaterial = new THREE.MeshLambertMaterial({
+                map: groundTexture
+            });
+
+            var mesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(20000, 20000), groundMaterial);
+            mesh.position.y = -250;
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+
+            // poles 极点
+
+            var poleGeo = new THREE.BoxBufferGeometry(5, 375, 5);
+
+            // 这个类是另一种创建几何体对象的方式,它将所有的数据包括顶点位置,法线,面,颜色,uv和其它的自定义属性存在缓冲区,
+            // 这样可以减少GPU的负荷,BufferGeometry同样也比Geometry对象复杂,增加了使用的难度,这里的属性都是存放在数组中,
+            // 比如顶点位置不是Vector3对象,颜色也不是color对象,而是数组.需要访问这些属性,需要从属性缓冲区中读原始数据.
+            // NOTE:根据BufferGeometry类特性,我们在创建一些静态对象,实例化后不经常操作的对象时,选择这个类.
+            //
+            var poleMat = new THREE.MeshLambertMaterial();
+            // 这种材质可以用来创建暗淡的并不光亮的表面。
+            // 无光泽表面的材质，无镜面高光。
+            // 这可以很好地模拟一些表面（如未经处理的木材或石头），但不能用镜面高光（如上漆木材）模拟光泽表面。
+            // 该材质非常易用，而且会对场景中的光源产生反应
+
+            var mesh = new THREE.Mesh(poleGeo, poleMat);
+            mesh.position.x = -125;
+            mesh.position.y = -62;
+            mesh.receiveShadow = true;
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            var mesh = new THREE.Mesh(poleGeo, poleMat);
+            mesh.position.x = 125;
+            mesh.position.y = -62;
+            mesh.receiveShadow = true;
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            var mesh = new THREE.Mesh(new THREE.BoxBufferGeometry(255, 5, 5), poleMat);
+            mesh.position.y = -250 + (750 / 2);
+            mesh.position.x = 0;
+            mesh.receiveShadow = true;
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            var gg = new THREE.BoxBufferGeometry(10, 10, 10);
+            var mesh = new THREE.Mesh(gg, poleMat);
+            mesh.position.y = -250;
+            mesh.position.x = 125;
+            mesh.receiveShadow = true;
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            var mesh = new THREE.Mesh(gg, poleMat);
+            mesh.position.y = -250;
+            mesh.position.x = -125;
+            mesh.receiveShadow = true;
+            mesh.castShadow = true;
+            scene.add(mesh);
+
+            // renderer
+
+            renderer = new THREE.WebGLRenderer({
+                antialias: true
+            });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            container.appendChild(renderer.domElement);
+
+            renderer.gammaInput = true;
+            renderer.gammaOutput = true;
+
+            renderer.shadowMap.enabled = true;
+
+            // controls
+            var controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.maxPolarAngle = Math.PI * 0.5;
+            controls.minDistance = 1000;
+            controls.maxDistance = 5000;
+
+            // performance monitor
+
+            stats = new Stats();
+            container.appendChild(stats.dom);
+
+            //
+
+            window.addEventListener('resize', onWindowResize, false);
+
+            sphere.visible = !true;
+
+        }
+
+        //
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        //
+
+        function animate() {
+
+            requestAnimationFrame(animate);
+            //当你准备更新动画时你应该调用此方法。这将使浏览器在下一次重绘之前调用你传入给该方法的动画函数(即你的回调函数)。回调函数执行次数通常是每秒60次，但在大多数遵循W3C建议的浏览器中，回调函数执行次数通常与浏览器屏幕刷新次数相匹配。为了提高性能和电池寿命，因此在大多数浏览器里，当requestAnimationFrame() 运行在后台标签页或者隐藏的<iframe> 里时，requestAnimationFrame() 会被暂停调用以提升性能和电池寿命。
+
+            var time = Date.now();
+
+            var windStrength = Math.cos(time / 7000) * 20 + 40;
+
+            windForce.set(Math.sin(time / 2000), Math.cos(time / 3000), Math.sin(time / 1000))
+            windForce.normalize() //归一化
+            windForce.multiplyScalar(windStrength);
+
+            simulate(time);
+            render();
+            stats.update(); //FPS
+
+        }
+
+        function render() {
+
+            var p = cloth.particles;
+
+            //更新布料几何体的坐标位置
+            for (var i = 0, il = p.length; i < il; i++) {
+                clothGeometry.vertices[i].copy(p[i].position);
+            }
+
+            //更新
+            clothGeometry.verticesNeedUpdate = true;
+
+            clothGeometry.computeFaceNormals(); //重新计算贴图？
+            clothGeometry.computeVertexNormals(); //重新计算顶点坐标 verticesNeedUpdate = true
+
+            sphere.position.copy(ballPosition); //重新计算球体坐标
+
+            renderer.render(scene, camera);
+
+        }
+    </script>
+</body>
+
+</html>

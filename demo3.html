@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+
+<body>
+    <script src="js/d3.min.js"></script>
+    <script>
+        //定义坐标类 二维坐标
+        var Vector2 = function (x, y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        //定义Ball类 质量、位置、速度
+        var Ball = function (m, r, color, location, speed) {
+            this.m = m;
+            this.r = r;
+            this.color = color;
+            this.location = location;
+            this.speed = speed;
+        }
+
+        //工具
+        var tools = {
+            //球体间距离
+            getDistance: function (ball1, ball2) {
+                return Math.sqrt((ball1.location.x - ball2.location.x) * (ball1.location.x - ball2.location.x) + (ball1.location.y - ball2.location.y) * (ball1.location.y - ball2.location.y));
+            },
+            //万有引力
+            getForce: function (ball1, ball2) {
+                var F = (G * ball1.m * ball2.m) / (this.getDistance(ball1, ball2));
+                //力的方向 ball1=>sun ball2=>earth
+                var direction = new Vector2(ball1.location.x - ball2.location.x, ball1.location.y - ball2.location.y);
+                var directionDistanse = Math.sqrt(direction.x * direction.x + direction.y * direction.y);
+                return new Vector2(direction.x * F / directionDistanse, direction.y * F / directionDistanse)
+            },
+            //加速度
+            getA: function (F, ball) {
+                return new Vector2(F.x / ball.m, F.y / ball.m);
+            },
+            //速度
+            getSpeed: function (speed, a, t) {
+                return new Vector2(speed.x + a.x * t, speed.y + a.y * t);
+            },
+            //位置偏移量
+            getS: function (speed, a, t) {
+                return new Vector2(speed.x * t + a.x * t * t / 2, speed.y * t + a.y * t * t / 2);
+            }
+        }
+
+        //初始化常量
+        var PI = Math.PI;
+        var universe = new Vector2(1200, 800);
+        var center = new Vector2(600, 400);
+        var dt = 1 / 60;
+        var G = 8; //万有引力常数
+
+        //初始化Sun Earth
+        var sun = new Ball(100, 20, 'red', new Vector2(center.x, center.y), new Vector2(0, 0));
+        var earth = new Ball(10, 10, 'blue', new Vector2(center.x + 200, center.y), new Vector2(0, -10));
+
+        //画布
+        var svg = d3.select('body').append('svg').attr('width', universe.x).attr('height', universe.y);
+
+        var init = function () {
+            //绘制太阳
+            svg.append('circle').attr('id', 'sun').attr('cx', sun.location.x).attr('cy', sun.location.y).attr('r', sun.r).attr('fill', sun.color);
+            //绘制地球
+            svg.append('circle').attr('id', 'earth').attr('cx', earth.location.x).attr('cy', earth.location.y).attr('r', earth.r).attr('fill', earth.color);
+        }
+
+        var run = function () {
+            setInterval(function () {
+                //作用于地球的力
+                var F = tools.getForce(sun, earth);
+                var a = tools.getA(F, earth);
+                var s = tools.getS(earth.speed, a, dt);
+                //更新地球状态
+                var v = tools.getSpeed(earth.speed, a, dt);
+                // debugger
+                earth.location.x += s.x;
+                earth.location.y += s.y;
+                earth.speed = v;
+                svg.select('#earth').attr('cx', earth.location.x).attr('cy', earth.location.y);
+            }, dt)
+        }
+        init();
+        run();
+    </script>
+</body>
+
+</html>

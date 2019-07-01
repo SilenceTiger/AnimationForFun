@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<style>
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #fff;
+    }
+</style>
+
+<body>
+    <script src="js/d3.min.js"></script>
+    <script>
+        //宇宙画布
+        var universe = {
+            x: 1200,
+            y: 800
+        }
+        //椭圆参数 (x*x)/(a*a) + (y*y)/(b*b) = 1
+        var ellipse = {
+            a: 500,
+            b: 300,
+            c: 400
+        }
+        //圆的参数
+        var circle = {
+            r: 40
+        }
+        //地球绕太阳一周时间为T,月亮绕地球一周时间为t;单位秒
+        var t = 10;
+        var T = 100;
+        var d_t = 1 / 60;   //60帧
+        //变化角度
+        var PI = Math.PI;
+        var d_cita = 2 * PI * d_t / T;  //地球相对太阳的角度变化量
+        var d_beta = 2 * PI * d_t / t;  //月亮相对地球的角度变化量
+        //初始化角度
+        var cita = 0; //地球
+        var beta = 0; //月球
+        //画布
+        var svg = d3.select('body').append('svg').attr('width', universe.x).attr('height', universe.y);
+        //地球轨迹
+        svg.append('ellipse').attr('cx', universe.x / 2).attr('cy', universe.y / 2).attr('rx', ellipse.a).attr('ry', ellipse.b).attr('fill', 'none').attr('stroke', 'red').attr('stroke-width', '2');
+        //太阳
+        svg.append('circle').attr("id", "sun").attr('cx', universe.x / 2 - ellipse.c).attr('cy', universe.y / 2).attr('r', '50').attr('fill', 'red');
+        //初始化位置
+        var earth = {
+            x: universe.x / 2 + ellipse.a,
+            y: universe.y / 2
+        }
+        var moon = {
+            x: universe.x / 2 + ellipse.a + circle.r,
+            y: universe.y / 2
+        }
+        var initLocation = function () {
+            //地球
+            svg.append('circle').attr("id", "earth").attr('cx', earth.x).attr('cy', earth.y).attr('r', '10').attr('fill', 'blue');
+            //月球
+            svg.append('circle').attr("id", "moon").attr('cx', moon.x).attr('cy', moon.y).attr('r', '5').attr('fill', 'grey');
+        }
+        var run = function () {
+            cita += d_cita;
+            beta += d_beta;
+            earth.x = universe.x / 2 + ellipse.a * Math.cos(cita);
+            earth.y = universe.y / 2 - ellipse.b * Math.sin(cita);
+
+            moon.x = earth.x + circle.r * Math.cos(beta);
+            moon.y = earth.y + circle.r * Math.sin(beta);
+ 
+            svg.select('#earth').attr('cx', earth.x).attr('cy', earth.y);
+            svg.select('#moon').attr('cx', moon.x).attr('cy', moon.y);
+        }
+
+        var animationBegin = function () {
+            setInterval(run, d_t)
+        }
+
+        initLocation();
+        animationBegin();
+    </script>
+</body>
+
+</html>

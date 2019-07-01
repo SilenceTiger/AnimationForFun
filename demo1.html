@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+
+<body>
+    <script src="js/d3.min.js"></script>
+    <script>
+        var T = 10 * 1000; //周期10秒
+        var t = 1 / 60 * 1000; //每隔时间t执行一次动画
+        var mi_cita = 2 * Math.PI * t / T; //每隔时间t，角度变化量
+        var cita = 0;
+        var r = 40; //圆半径
+        var r_max = 60;
+        var r_min = 20;
+        var PI = Math.PI;
+        var mini = 0.00001; //很小的角度
+
+        var circle = [0, PI / 3, 2 * PI / 3, PI, 4 * PI / 3, 5 * PI / 3];
+
+        var center = { //中心点
+            x: 400,
+            y: 300,
+        };
+
+        var a = 300,
+            b = 150; //椭圆a b参数,以center作为o  x^2/a^2 + y^2/b^2 = 1
+        var c = Math.sqrt(a * a - b * b);
+        var e = c / a; //离心率
+
+        var C = 2 * Math.PI * b + 4 * (a - b); //椭圆周长 近似值
+
+        var svg = d3.select('body').append('svg').attr('height', 600).attr('width', 800); //svg stage; 800 * 600
+
+        svg.append("ellipse").attr("cx", center.x).attr("cy", center.y) //椭圆
+            .attr("rx", a).attr("ry", b)
+            .attr("stroke", "blue").attr("stroke-width", "2")
+            .attr("fill", "none");
+
+        for (var i = 0; i < circle.length; i++) {
+            var cita = circle[i];
+            var _x = center.x + a * Math.cos(cita);
+            var _y = center.y - b * Math.sin(cita);
+            svg.append("circle").attr("id", "circle" + i).attr("cx", _x).attr("cy", _y).attr("r", r).attr("fill", "red");
+        }
+
+
+        // var timer = setInterval(function () {
+
+        //     for (var i = 0; i < circle.length; i++) {
+        //         // var _cita = calculateCita(circle[i]);
+        //         // circle[i] += _cita;
+        //         circle[i] += mi_cita;
+        //         if (circle[i] >= 2 * Math.PI) {
+        //             circle[i] = 0;
+        //         }
+        //         var _x = center.x + a * Math.cos(circle[i]);
+        //         var _y = center.y - b * Math.sin(circle[i]);
+        //         var _r = calculateRadius(circle[i]);
+        //         svg.select("#circle" + i).attr("cx", _x).attr("cy", _y).attr("r", _r).attr("fill", "red");
+        //     }
+        // }, t);
+
+        //动态计算旋转圆半径
+        // 0 < cita < pi/2 : r => r_min
+        // pi/2 < cita < pi : r_min => r
+        // pi < cita < pi/2*3 : r => r_max
+        // pi/2*3 < cita < 2*pi : r_max => r
+        var calculateRadius = function (cita) {
+            var _r;
+            if (cita > 0 && cita <= Math.PI / 2) {
+                var linear1 = d3.scaleLinear().domain([0, Math.PI / 2]).range([r, r_min]);
+                _r = linear1(cita);
+            } else if (cita > Math.PI / 2 && cita <= Math.PI) {
+                var linear2 = d3.scaleLinear().domain([Math.PI / 2, Math.PI]).range([r_min, r]);
+                _r = linear2(cita);
+            } else if (cita > Math.PI / 2 && cita <= 3 / 2 * Math.PI) {
+                var linear3 = d3.scaleLinear().domain([Math.PI, 3 / 2 * Math.PI]).range([r, r_max]);
+                _r = linear3(cita);
+            } else if (cita > 3 / 2 * Math.PI && cita <= 2 * Math.PI) {
+                var linear4 = d3.scaleLinear().domain([3 / 2 * Math.PI, 2 * Math.PI]).range([r_max, r]);
+                _r = linear4(cita);
+            } else {
+                _r = 40;
+            }
+            return _r
+        }
+
+        var calculateCita = function (cita) {
+            var _cita = cita;
+            var l = C * t / T;
+            var _begin = {},
+                _end = {},
+                sum = 0;
+
+            while (sum < l) {
+                _begin = calculateCoordinate(_cita);
+                _end = calculateCoordinate(_cita + mini);
+                sum += distance(_begin, _end);
+                _cita += mini;
+            }
+            return _cita - cita;
+        }
+        //两点间距离公式
+        var distance = function (begin, end) {
+            return Math.sqrt((begin.x - end.x) * (begin.x - end.x) + (begin.y - end.y) * (begin.y - end.y));
+        }
+        //计算坐标
+        var calculateCoordinate = function (cita) {
+            return {
+                x: center.x + a * Math.cos(cita),
+                y: center.y - b * Math.sin(cita)
+            }
+        }
+    </script>
+</body>
+
+</html>
